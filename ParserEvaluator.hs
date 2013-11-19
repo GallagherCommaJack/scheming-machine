@@ -1,3 +1,6 @@
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 module ParserEvaluator
 (	readExpr
 ,	showVal
@@ -15,10 +18,15 @@ module ParserEvaluator
 ,	runIOThrows
 ,	liftThrows
 ,	primitiveBindings
-,	bindVars)
+,	bindVars
+,	numericIntOp
+,	numericFloatOp
+,	numericNumOp
+,	load)
 where
 import Text.ParserCombinators.Parsec hiding (spaces)
-import Text.Parsec.Token hiding (symbol)
+import qualified Text.ParserCombinators.Parsec.Token as P hiding (symbol)
+import Text.ParserCombinators.Parsec.Language (emptyDef)
 import Data.Char
 import Control.Monad
 import System.IO
@@ -27,9 +35,11 @@ import Text.Parsec.Error
 import Data.IORef
 import Control.Applicative hiding ((<|>), many)
 import Numeric
-import qualified Data.Vector as V
+import Data.Ratio
+import GHC.Float
+--import qualified Data.Vector as V
 
-
+lexer = P.makeTokenParser emptyDef
 
 parseString :: Parser LispVal
 parseString = do
@@ -71,42 +81,106 @@ parseNumber :: Parser LispVal
 parseNumber = 	try parseOctal
 -- 			<|> try parseBin
 			<|> try parseHex
- 			<|> try parseFloat
+--			<|> try parseFloat
+--			<|> try parseDecimal
 			<|> parseDouble
-			<|>	parseInt
-			
+			<|> parseInt
+--			<|>	parseDecimal
+
+--naturalOrFloat = P.naturalOrFloat lexer
+data Sign      = Positive | Negative
+
+applySign          :: Num a => Sign -> a -> a
+applySign Positive =  id
+applySign Negative =  negate
+
+sign  :: Parser Sign
+sign  =  do 
+			char '-'
+			return Negative
+	 <|> do 
+			char '+'
+			return Positive
+	 <|> return Positive
+
+--genericgrab :: Parser (Either Integer Double)
+--genericgrab = do 
+--				s   <- sign
+--				num <- naturalOrFloat
+--				return $ case num of
+--							Right x -> Right (applySign s x)
+--							Left  x -> Left  (applySign s x)
+							
+--parseDecimal :: Parser LispVal
+--parseDecimal = do
+--	num <- genericgrab
+--	case num of
+--		Left int -> return $ Int int
+--		Right dub -> return $ Double dub
+
 
 parseInt :: Parser LispVal
-parseInt = many1 digit >>= return . Int . read
+parseInt = do
+	s <- sign
+	num <- many1 digit >>= return . read
+	return . Int $ applySign s num
+	
+--parseInt = parseNegativeInt <|> parsePositiveInt 
+--	where
+--		parsePositiveInt = many1 digit >>= return . Int . read
+--		parseNegativeInt = do
+--			char '-'
+--			x <- parsePositiveInt
+--			return $ Int $ -((extractValue . unpackNum) x)
+--parseInt = parseInteger >>= return . Int
+ 
+--parseInteger = rd <$> (plus <|> minus <|> number)
+--	where 
+--		rd 		= read :: String -> Integer
+--		plus	= char '+' *> number
+--		minus	= (:) <$> char '-' <*> number
+--		number 	= many1 digit
 
 parseBin :: Parser String
 parseBin = do
 	string "#b"
 	many (oneOf "01")
-
+ 
 parseOctal :: Parser LispVal
 parseOctal = do
 	string "#o"
-	many (oneOf ['1'..'7'])
-	>>= return . Int . fst . head . readOct
+	s <- sign
+	numString <- many (oneOf ['1'..'7'])
+	(return . Int . applySign s . fst . head . readOct) numString
 
 parseHex :: Parser LispVal
 parseHex = do
 	string "#h"
-	many (oneOf (['0'..'9'] ++ ['A'..'F'] ++ ['a'..'f'])) 
-	>>= return . Int . fst . head . readHex
+	s <- sign
+	numString <- many (oneOf $ ['0'..'9'] ++ ['A'..'F'] ++ ['a'..'f'])
+	(return . Int . applySign s . fst . head . readHex) numString 
 
 parseFloat :: Parser LispVal
 parseFloat = do
 	string "#f"
-	x <- many (try (char '.') <|> digit)
-	return . Float $ (read x :: Float)
+	s <- sign
+	numString <- many (oneOf ['0'..'9'] <|> char '.')
+	(return . Float . applySign s) (read numString :: Float)
 
 parseDouble :: Parser LispVal
 parseDouble = do
 	string "#d"
-	x <- many (try (char '.') <|> digit)
-	return . Double $ (read x :: Double)
+	s <- sign
+	numString <- many (char '.' <|> digit)
+	(return . Double . applySign s) (read numString :: Double)
+
+parseDecimal :: Parser LispVal
+parseDecimal = do
+	s <- sign
+	numString <- many (char '.' <|> digit)
+	if (elem '.' numString)
+		then (return . Double . applySign s) (read numString :: Double)
+		else (return . Int . applySign s) (read numString :: Integer)
 
 symbol :: Parser Char
 symbol = oneOf "'!#$%&|*+-/:<=>?@^_~"
@@ -135,75 +209,32 @@ parseQuoted = do
 	x <- parseExpr
 	return $ List [Atom "quote", x]
 		
-parseVector :: Parser LispVal
-parseVector = do
-	char '#'
-	x <- parseExpr
-	case x of 
-		List xs -> return $ Vector (V.fromList xs)
-		DottedList xs x -> return $ Vector (V.snoc (V.fromList xs) x)
-		_ -> error "Tried to construct a vector from non-list"
+--parseVector :: Parser LispVal
+--parseVector = do
+--	char '#'
+--	x <- parseExpr
+--	case x of 
+--		List xs -> return $ Vector (V.fromList xs)
+--		DottedList xs x -> return $ Vector (V.snoc (V.fromList xs) x)
+--		_ -> error "Tried to construct a vector from non-list"
 
 parseExpr :: Parser LispVal
 parseExpr = try parseChar
 		<|> try parseNumber
 		<|> try parseString
 		<|> try parseQuoted
-		<|> try parseVector
+--		<|> try parseVector
 		<|> try parseAtom
 		<|>	try parseList
 		<|> try parseDottedList
 
 readOrThrow :: Parser a -> String -> ThrowsError a
 readOrThrow parser input = case parse parser "lisp" input of
-    Left err -> throwError $ Parser err
-    Right val -> return val
-
+	Left err -> throwError $ Parser err
+	Right val -> return val
 
 readExpr = readOrThrow parseExpr
 readExprList = readOrThrow (endBy parseExpr spaces)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 data LispVal =    Atom String
@@ -214,14 +245,67 @@ data LispVal =    Atom String
 				| Double Double
 				| String String
 				| Bool Bool 
-				| Vector (V.Vector LispVal)
+--				| Vector (V.Vector LispVal)
 				| Char Char 
 				| PrimitiveFunc ([LispVal] -> ThrowsError LispVal)
-				| Func {params :: [String], vararg :: (Maybe String), 
-						body :: [LispVal], closure :: Env}
 				| IOFunc ([LispVal] -> IOThrowsError LispVal)
 				| Port Handle
+				| Func {params :: [String], vararg :: (Maybe String), 
+						body :: [LispVal], closure :: Env}
 
+instance Num LispVal where
+	(Int i1) + (Int i2) = Int $ i1 + i2
+	(Int i1) + (Float f2) = Float $ fromInteger i1 + f2
+	(Int i1) + (Double d2) = Double $ fromInteger i1 + d2
+	(Float f1) + (Float f2) = Float $ f1 + f2
+	(Float f1) + (Int i2) = Float $ f1 + fromInteger i2
+	(Float f1) + (Double d2) = Double $ float2Double f1 + d2
+	(Double d1) + (Double d2) = Double $ d1 + d2
+	(Double d1) + (Int i2) = Double $ d1 + fromInteger i2
+	(Double d1) + (Float f2) = Double $ d1 + float2Double f2
+	l1 + l2 = Int $ (extractValue $ unpackNum l1) + (extractValue $ unpackNum l2)
+
+	(Int i1) * (Int i2) = Int $ i1 * i2
+	(Int i1) * (Float f2) = Float $ fromInteger i1 * f2
+	(Int i1) * (Double d2) = Double $ fromInteger i1 * d2
+	(Float f1) * (Float f2) = Float $ f1 * f2
+	(Float f1) * (Int i2) = Float $ f1 * fromInteger i2
+	(Double d1) * (Double d2) = Double $ d1 * d2
+	(Double d1) * (Int i2) = Double $ d1 * fromInteger i2
+	(Double d1) * (Float f2) = Double $ d1 * float2Double f2
+	l1 * l2 = Int $ (extractValue $ unpackNum l1) * (extractValue $ unpackNum l2)
+
+	abs (Int i)			= Int $ abs i
+	abs (Float f) 		= Float $ abs f
+	abs (Double d) 		= Double $ abs d
+	abs l 				= Int $ abs $ extractValue $ unpackNum l
+	--signum (Int i)		= signum i
+	--signum (Float f)	= signum f
+	--signum (Double d) 	= signum d
+	signum _ 			= undefined
+	fromInteger n 		= Int n
+	negate n       		= n * Int (-1)
+
+
+instance Fractional LispVal where
+	(Int i1) / (Int i2) = Double $ (fromInteger i1) / (fromInteger i2)
+	(Int i1) / (Float f2) = Float $ (fromInteger i1) / f2
+	(Int i1) / (Double d2) = Double $ (fromInteger i1) / d2
+	(Float f1) / (Int i2) = Float $ f1 / (fromInteger i2)
+	(Float f1) / (Float f2) = Float $ f1 / f2
+	(Float f1) / (Double d2) = Double $ float2Double f1 / d2
+	(Double d1) / (Int i2) = Double $ d1 / (fromInteger i2)
+	(Double d1) / (Float f2) = Double $ d1 / float2Double f2
+	(Double d1) / (Double d2) = Double $ d1 / d2
+	_ / _ = undefined
+	fromRational rat = Double $ (fromIntegral . numerator) rat / (fromIntegral . denominator) rat
+
+instance Ord LispVal where
+	(Int i1) < (Int i2) = i1 < i2
+	(Int i1) < (Double d2) = fromInteger i1 < d2
+	(Double d1) < (Int i2) = d1 < fromInteger i2
+	(Double d1) < (Double d2) = d1 < d2
+	_ < _ = error "tried to order non-numbers"
 
 eqLispVal :: LispVal -> LispVal -> Bool
 eqLispVal v1 v2 = boolExtractor $ eqv [v1,v2]
@@ -237,7 +321,7 @@ showVal (Bool True) = "#t"
 showVal (Bool False) = "#f"
 showVal (Float contents) = show contents
 showVal (Double contents) = show contents
-showVal (Vector contents) = show contents
+--showVal (Vector contents) = show contents
 showVal (Char c) = [c]
 showVal (List contents) = "(" ++ unwordsList contents ++ ")"
 showVal (DottedList head tail) = "(" ++ unwordsList head ++ " . " ++ showVal tail ++ ")"
@@ -268,7 +352,18 @@ eval env (Atom a) = getVar env a
 eval _ (List [Atom "quote", val]) = return val
 eval env (List (Atom "cond":xs)) = condEvaluator env xs
 eval env (List (Atom "if":xs)) = ifEvaluator env xs
-eval env (List (Atom "case":x:xs)) = caseEvaluator env x xs
+--eval env form@(List (Atom "case" : key : clauses)) = 
+--	if null clauses
+--		then throwError $ BadSpecialForm "no true clause in case expression: " form
+--		else case head clauses of
+--				List (Atom "else" : exprs) -> mapM (eval env) exprs >>= return . last
+--				List ((List datums) : exprs) -> do
+--					result <- eval env key
+--					equality <- mapM (\x -> eqv [result, x]) datums
+--					if Bool True `elem` equality
+--						then mapM eval env exprs >>= return . last
+--						else eval env $ List (Atom "case" : key : tail clauses)
+--				_	-> liftThrows . throwError $ BadSpecialForm "ill-formed case expression: " form
 eval env (List [Atom "set!", Atom var, form]) = eval env form >>= setVar env var
 eval env (List [Atom "define", Atom var, form]) = eval env form >>= defineVar env var
 eval env (List (Atom "define" : List (Atom var : params) : body)) = makeNormalFunc env params body >>= defineVar env var
@@ -276,7 +371,8 @@ eval env (List (Atom "define" : DottedList (Atom var : params) varargs : body)) 
 eval env (List (Atom "lambda" : List params : body)) = makeNormalFunc env params body
 eval env (List (Atom "lambda" : DottedList params varargs : body)) = makeVarargs varargs env params body
 eval env (List (Atom "lambda" : varargs@(Atom _) : body)) = makeVarargs varargs env [] body
-eval env (List [Atom "load", String filename]) = load filename >>= liftM last . mapM (eval env)
+eval env (List [Atom "load", String filename]) = 
+	load filename >>= liftM last . mapM (eval env)
 eval env (List (function : args)) = do 
 	func <- eval env function
 	argVals <- mapM (eval env) args
@@ -310,11 +406,19 @@ ifEvaluator env (pred:conseq:alt:_) = do
 ifEvaluator _ xs = throwError $ NumArgs 3 xs
 
 
-caseEvaluator :: Env -> LispVal -> [LispVal] -> IOThrowsError LispVal
-caseEvaualotr env _ ((List (Atom "else":result:_)):_) = eval env result
-caseEvaluator env subject ((List ((List x):result:_)):xs) = if (elem subject x) then eval env result else caseEvaluator env subject xs
-caseEvaluator _ _ (x:xs) = throwError $ TypeMismatch "Pair" x
-caseEvaluator _ _ [] = throwError $ UnboundVar "No catchall " "else"
+--caseEvaluator :: Env -> LispVal -> IOThrowsError LispVal
+--caseEvaluator env form@(List (Atom "case":key:clauses)) = 
+--	if null clauses
+--		then throwError $ BadSpecialForm "no true clause in case expression: " form
+--		else case head clauses of
+--				List (Atom "else" : exprs) -> mapM eval exprs >>= return . last
+--				List ((List datums) : exprs) -> do
+--					result <- eval env key
+--					equality <- mapM (\x -> eqv [result, x]) datums
+--					if Bool True `elem` equality
+--						then mapM eval env exprs >>= return . last
+--						else eval env $ List (Atom "case" : key : tail clauses)
+--				_	-> liftThrows . throwError $ BadSpecialForm "ill-formed case expression: " form
 
 apply :: LispVal -> [LispVal] -> IOThrowsError LispVal
 apply (PrimitiveFunc func) args = liftThrows $ func args
@@ -333,22 +437,23 @@ apply (IOFunc func) args = func args
 
 primitiveBindings :: IO Env
 primitiveBindings = nullEnv >>= (flip bindVars $ map (makeFunc IOFunc) ioPrimitives
-											  ++ map (makeFunc PrimitiveFunc) primitives)
+												++ map (makeFunc PrimitiveFunc) primitives)
 	where makeFunc constructor (var, func) = (var, constructor func)
 
 primitives :: [(String, [LispVal] -> ThrowsError LispVal)]
-primitives = [	("+", numericBinop (+)),
-				("-", numericBinop (-)),
-				("*", numericBinop (*)),
-				("/", numericBinop div),
-				("mod", numericBinop mod),
-				("quotient", numericBinop quot),
-				("remainder", numericBinop rem),
+primitives = [	("+", numericNumOp (+)),
+				("-", numericNumOp (-)),
+				("*", numericNumOp (*)),
+				("/", numericFloatOp (/)),
+				("div", numericIntOp div),
+				("mod", numericIntOp mod),
+				("quotient", numericIntOp quot),
+				("remainder", numericIntOp rem),
 				("string?", checker "string"),
 				("symbol?", checker "symbol"),
 				("int?", checker "int"),
 				("bool?", checker "bool"),
-				("vector?", checker "vector"),
+				--("vector?", checker "vector"),
 				("list?", checker "list"),
 				("char?", checker "char"),
 				("float?", checker "float"),
@@ -358,12 +463,11 @@ primitives = [	("+", numericBinop (+)),
 				("contains-Double?", checker "contains-Double"),
 				("symbol->string", converter "symbol->string"),
 				("string->symbol", converter "string->symbol"),
-				("=", numBoolBinop (==)),
-				("<", numBoolBinop (<)),
-				(">", numBoolBinop (>)),
-				("/=", numBoolBinop (/=)),
-				(">=", numBoolBinop (>=)),
-				("<=", numBoolBinop (<=)),
+				("<", boolOp (<)),
+				(">", boolOp (>)),
+				("/=", boolOp (/=)),
+				(">=", boolOp (>=)),
+				("<=", boolOp (<=)),
 				("&&", boolBoolBinop (&&)),
 				("||", boolBoolBinop (||)),
 				("string=?", strBoolBinop (==)),
@@ -374,7 +478,10 @@ primitives = [	("+", numericBinop (+)),
 				("car", listOps "car"),
 				("cdr", listOps "cdr"),
 				("cons", listOps "cons"),
-				("eqv", equality "eqv"),
+				("=", equality "eqv"),
+				("eq?", equality "eqv"),
+				("eqv?", equality "eqv"),
+				("equal?", equality "equal"),
 				("string", stringOps "string"),
 				("make-string", stringOps "make-string"),
 				("string-length", stringOps "string-length"),
@@ -427,17 +534,28 @@ substring ((String s):(Int start):(Int end):_) = return $ String $ take (fromInt
 substring ((String _):y:z:_) = throwError $ TypeMismatch "Int, Int" $ List [y,z]
 substring list@(x:xs) = throwError $ NumArgs 3 list
 
-numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> ThrowsError LispVal
-numericBinop op           []  = throwError $ NumArgs 2 []
-numericBinop op singleVal@[_] = throwError $ NumArgs 2 singleVal
-numericBinop op params = mapM unpackNum params >>= return . Int . foldl1 op
---numericBinop op params
---	|	containsDouble = return $ Double $ foldl1 op $ map (\x -> if (boolExtractor . extractValue . checker "double" x) then unpackNum x else (fromInteger (unpackNum x) :: Double)) params
---	| 	otherwise = return $ Int $ foldl1 op $ map unpackNum params
---	where
---		containsDouble = (boolExtractor . extractValue . checker "contains-Double") params
+numericIntOp :: (Integer -> Integer -> Integer) -> [LispVal] -> ThrowsError LispVal
+numericIntOp op           []  = throwError $ NumArgs 2 []
+numericIntOp op singleVal@[_] = throwError $ NumArgs 2 singleVal
+numericIntOp op params = mapM unpackNum params >>= return . Int . foldl1 op
 
+numericNumOp :: MonadError LispError m => (LispVal -> LispVal -> LispVal) -> [LispVal] -> m LispVal
+numericNumOp op           []  = throwError $ NumArgs 2 []
+numericNumOp op singleVal@[_] = throwError $ NumArgs 2 singleVal
+numericNumOp op params = return $ foldl1 op params
 
+numericFloatOp :: MonadError LispError m => (LispVal -> LispVal -> LispVal) -> [LispVal] -> m LispVal
+numericFloatOp op           []  = throwError $ NumArgs 2 []
+numericFloatOp op singleVal@[_] = throwError $ NumArgs 2 singleVal
+numericFloatOp op params = return $ foldl1 op params
+
+boolOp :: (LispVal -> LispVal -> Bool) -> [LispVal] -> ThrowsError LispVal
+boolOp op args = 	if length args /= 2
+					then throwError $ NumArgs 2 args
+					else do
+						let left = args !! 0
+						let right = args !! 1
+						return $ Bool $ left `op` right
 
 boolBinop :: (LispVal -> ThrowsError a) -> (a -> a -> Bool) -> [LispVal] -> ThrowsError LispVal
 boolBinop unpacker op args = if length args /= 2 
@@ -464,7 +582,7 @@ typeChecker "string" (String _) = return $ Bool True
 typeChecker "symbol" (Atom _) = return $ Bool True
 typeChecker "int" (Int _) = return $ Bool True
 typeChecker "bool" (Bool _) = return $ Bool True
-typeChecker "vector" (Vector _) = return $ Bool True
+--typeChecker "vector" (Vector _) = return $ Bool True
 typeChecker "list" (List _) = return $ Bool True
 typeChecker "char" (Char _) = return $ Bool True
 typeChecker "double" (Double _) = return $ Bool True
@@ -503,6 +621,8 @@ contains _ [] = return $ Bool False
 
 
 --Unpackers
+data Unpacker = forall a. Eq a => AnyUnpacker (LispVal -> ThrowsError a)
+
 unpackNum :: LispVal -> ThrowsError Integer
 unpackNum (Int n) = return n
 unpackNum (String n) = let parsed = reads n in 
@@ -529,6 +649,14 @@ unpackBool notBool = throwError $ TypeMismatch "boolean" notBool
 unpackChar :: LispVal -> ThrowsError Char
 unpackChar (Char c) = return c
 unpackChar notChar = throwError $ TypeMismatch "char" notChar
+
+unpackEquals :: LispVal -> LispVal -> Unpacker -> ThrowsError Bool
+unpackEquals arg1 arg2 (AnyUnpacker unpacker) = 
+			do 
+				unpacked1 <- unpacker arg1
+				unpacked2 <- unpacker arg2
+				return $ unpacked1 == unpacked2
+		`catchError` (const $ return False)
 
 
 
@@ -565,7 +693,16 @@ cons badArgList = throwError $ NumArgs 2 badArgList
 --Equality
 equality :: String -> [LispVal] -> ThrowsError LispVal
 equality "eqv" xs = eqv xs
+equality "equal" xs = equal xs
 equality _ _ = throwError $ NotFunction "Invalid equalitiy" "equality"
+
+eqvList :: ([LispVal] -> ThrowsError LispVal) -> [LispVal] -> ThrowsError LispVal
+eqvList eqvFunc [(List arg1), (List arg2)] = return $ Bool $ (length arg1 == length arg2) && 
+													 (all eqvPair $ zip arg1 arg2)
+		where eqvPair (x1, x2) = case eqvFunc [x1, x2] of
+									Left err -> False
+									Right (Bool val) -> val
+
 
 eqv :: [LispVal] -> ThrowsError LispVal
 --eqv [a,b] = return $ Bool $ a == b
@@ -576,13 +713,19 @@ eqv [(Atom arg1), (Atom arg2)] = return $ Bool $ arg1 == arg2
 eqv [(Atom arg1), (Int arg2)] = return $ Bool $ (read arg1) == arg2
 eqv [(Int arg1), (Atom arg2)] = return $ Bool $ (read arg2) == arg2
 eqv [(DottedList xs x), (DottedList ys y)] = eqv [List $ xs ++ [x], List $ ys ++ [y]]
-eqv [(List arg1), (List arg2)] = return $ Bool $ (length arg1 == length arg2) && (all eqvPair $ zip arg1 arg2)
-	where eqvPair (x1, x2) = case eqv [x1, x2] of
-								Left err -> False
-								Right (Bool val) -> val
+eqv [l1@(List arg1), l2@(List arg2)] = eqvList eqv [l1, l2]
 eqv [_, _] = return $ Bool False
 eqv badArgList = throwError $ NumArgs 2 badArgList
 
+equal :: [LispVal] -> ThrowsError LispVal
+equal [l1@(List arg1), l2@(List arg2)] = eqvList equal [l1, l2]
+equal [(DottedList xs x), (DottedList ys y)] = equal [List $ xs ++ [x], List $ ys ++ [y]]
+equal [arg1, arg2] = do
+	primitiveEquals <- liftM or $ mapM (unpackEquals arg1 arg2)
+						[AnyUnpacker unpackNum, AnyUnpacker unpackStr, AnyUnpacker unpackBool]
+	eqvEquals <- eqv [arg1, arg2]
+	return $ Bool $ (primitiveEquals || let (Bool x) = eqvEquals in x)
+equal badArgList = throwError $ NumArgs 2 badArgList
 
 
 
@@ -619,36 +762,7 @@ trapError action = catchError action (return . show)
 
 extractValue :: ThrowsError a -> a
 extractValue (Right val) = val
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+extractValue _ = error "couldn't extract value from LispError"
 
 --Environment dispatch
 --environment :: String -> Env -> [LispVal] -> ThrowsError LispVal
@@ -723,59 +837,10 @@ bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
 									ref <- newIORef value
 									return (var, ref)
 
-
-
 --Function creation
 makeFunc varargs env params body = return $ Func (map showVal params) varargs body env
 makeNormalFunc = makeFunc Nothing
 makeVarargs = makeFunc . Just . showVal
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 --IO
 ioPrimitives :: [(String, [LispVal] -> IOThrowsError LispVal)]
@@ -788,7 +853,7 @@ ioPrimitives = [("apply", applyProc),
 				("write", writeProc),
 				("read-contents", readContents),
 				("read-all", readAll)]
-
+				
 applyProc :: [LispVal] -> IOThrowsError LispVal
 applyProc [func, List args] = apply func args
 applyProc (func : args) = apply func args
@@ -797,7 +862,7 @@ makePort :: IOMode -> [LispVal] -> IOThrowsError LispVal
 makePort mode [String filename] = liftM Port $ liftIO $ openFile filename mode
 
 closePort :: [LispVal] -> IOThrowsError LispVal
-closePort [Port port] = liftIO $ hClose port >> return (Bool True)
+closePort [Port port] = liftIO $ hClose port >> (return $ Bool True)
 closePort _ = return $ Bool False
 
 readProc :: [LispVal] -> IOThrowsError LispVal
