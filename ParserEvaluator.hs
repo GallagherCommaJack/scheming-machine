@@ -252,6 +252,9 @@ data LispVal =    Atom String
 				| Port Handle
 				| Func {params :: [String], vararg :: (Maybe String), 
 						body :: [LispVal], closure :: Env}
+				| Macro {params :: [String], varArg :: (Maybe String),
+						 body :: [LispVal], closure :: Env}
+--				| Macro [LispVal]
 
 instance Num LispVal where
 	(Int i1) + (Int i2) = Int $ i1 + i2
@@ -368,6 +371,7 @@ eval env (List [Atom "set!", Atom var, form]) = eval env form >>= setVar env var
 eval env (List [Atom "define", Atom var, form]) = eval env form >>= defineVar env var
 eval env (List (Atom "define" : List (Atom var : params) : body)) = makeNormalFunc env params body >>= defineVar env var
 eval env (List (Atom "define" : DottedList (Atom var : params) varargs : body)) = makeVarargs varargs env params body >>= defineVar env var
+--eval env (List (Atom "defmacro" : List (Atom var : params) : body)) = makeNormalMacro env params body >>= defineVar env var
 eval env (List (Atom "lambda" : List params : body)) = makeNormalFunc env params body
 eval env (List (Atom "lambda" : DottedList params varargs : body)) = makeVarargs varargs env params body
 eval env (List (Atom "lambda" : varargs@(Atom _) : body)) = makeVarargs varargs env [] body
@@ -426,6 +430,20 @@ apply (Func params varargs body closure) args =
 	if num params /= num args && varargs == Nothing
 		then throwError $ NumArgs (num params) args
 		else (liftIO $ bindVars closure $ zip params args) >>= bindVarArgs varargs >>= evalBody
+	where 
+		remainingArgs = drop (length params) args
+		num = toInteger . length
+		evalBody env = liftM last $ mapM (eval env) body 
+		bindVarArgs arg env = case arg of
+			Just argName -> liftIO $ bindVars env [(argName, List $ remainingArgs)]
+			Nothing -> return env 
+apply (Macro params varargs body closure) args =
+	if num params /= num args && varargs == Nothing
+		then throwError $ NumArgs (num params) args
+		else do
+			newList <- evalBody closure
+			(liftIO . bindVars closure . zip params) args >>= bindVarArgs varargs >>= flip eval newList
+		--else (liftIO $ bindVars closure $ zip params args) >>= bindVarArgs varargs >>= evalBody
 	where 
 		remainingArgs = drop (length params) args
 		num = toInteger . length
@@ -841,6 +859,8 @@ bindVars envRef bindings = readIORef envRef >>= extendEnv bindings >>= newIORef
 makeFunc varargs env params body = return $ Func (map showVal params) varargs body env
 makeNormalFunc = makeFunc Nothing
 makeVarargs = makeFunc . Just . showVal
+
+--makeMacro varargs env params body = 
 
 --IO
 ioPrimitives :: [(String, [LispVal] -> IOThrowsError LispVal)]
