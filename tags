@@ -1,0 +1,135 @@
+AnyUnpacker	ParserEvaluator.hs	696;"	d	file:
+Atom	ParserEvaluator.hs	294;"	d
+BadSpecialForm	ParserEvaluator.hs	809;"	d
+Bool	ParserEvaluator.hs	301;"	d
+Char	ParserEvaluator.hs	303;"	d
+Default	ParserEvaluator.hs	812;"	d
+DottedList	ParserEvaluator.hs	296;"	d
+Double	ParserEvaluator.hs	299;"	d
+Env	ParserEvaluator.hs	860;"	t
+Float	ParserEvaluator.hs	298;"	d
+Func	ParserEvaluator.hs	307;"	d
+IOFunc	ParserEvaluator.hs	305;"	d
+IOThrowsError	ParserEvaluator.hs	865;"	t	file:
+Int	ParserEvaluator.hs	297;"	d
+LispError	ParserEvaluator.hs	806;"	t
+LispVal	ParserEvaluator.hs	294;"	t
+List	ParserEvaluator.hs	295;"	d
+Macro	ParserEvaluator.hs	309;"	d
+Negative	ParserEvaluator.hs	142;"	d	file:
+NotFunction	ParserEvaluator.hs	810;"	d
+NumArgs	ParserEvaluator.hs	806;"	d
+Parser	ParserEvaluator.hs	808;"	d
+Port	ParserEvaluator.hs	306;"	d
+Positive	ParserEvaluator.hs	142;"	d	file:
+PrimitiveFunc	ParserEvaluator.hs	304;"	d
+Sign	ParserEvaluator.hs	142;"	t	file:
+String	ParserEvaluator.hs	300;"	d
+ThrowsError	ParserEvaluator.hs	831;"	t
+TypeMismatch	ParserEvaluator.hs	807;"	d
+UnboundVar	ParserEvaluator.hs	811;"	d
+Unpacker	ParserEvaluator.hs	696;"	t	file:
+Vector	ParserEvaluator.hs	302;"	d
+apply	ParserEvaluator.hs	482;"	v
+applyProc	ParserEvaluator.hs	932;"	v	file:
+applySign	ParserEvaluator.hs	145;"	v	file:
+baseFloatRead	ParserEvaluator.hs	45;"	v	file:
+baseRead	ParserEvaluator.hs	88;"	v	file:
+bindVars	ParserEvaluator.hs	905;"	v
+body	ParserEvaluator.hs	308;"	v
+boolBinop	ParserEvaluator.hs	633;"	v	file:
+boolBoolBinop	ParserEvaluator.hs	642;"	v	file:
+boolExtractor	ParserEvaluator.hs	678;"	v	file:
+boolOp	ParserEvaluator.hs	625;"	v	file:
+car	ParserEvaluator.hs	743;"	v	file:
+cdr	ParserEvaluator.hs	749;"	v	file:
+checker	ParserEvaluator.hs	646;"	v	file:
+closePort	ParserEvaluator.hs	939;"	v	file:
+closure	ParserEvaluator.hs	308;"	v
+condEvaluator	ParserEvaluator.hs	448;"	v	file:
+cons	ParserEvaluator.hs	755;"	v	file:
+contains	ParserEvaluator.hs	685;"	v	file:
+converter	ParserEvaluator.hs	666;"	v	file:
+defineVar	ParserEvaluator.hs	894;"	v	file:
+eol	ParserEvaluator.hs	117;"	v	file:
+eqLispVal	ParserEvaluator.hs	368;"	v	file:
+equal	ParserEvaluator.hs	793;"	v	file:
+equality	ParserEvaluator.hs	767;"	v	file:
+eqv	ParserEvaluator.hs	781;"	v	file:
+eqvList	ParserEvaluator.hs	772;"	v	file:
+eval	ParserEvaluator.hs	403;"	v
+extractValue	ParserEvaluator.hs	836;"	v
+fastFloatRead	ParserEvaluator.hs	98;"	v	file:
+fastRead	ParserEvaluator.hs	94;"	v	file:
+getVar	ParserEvaluator.hs	878;"	v	file:
+ifEvaluator	ParserEvaluator.hs	458;"	v	file:
+ioPrimitives	ParserEvaluator.hs	921;"	v	file:
+isBound	ParserEvaluator.hs	875;"	v	file:
+liftThrows	ParserEvaluator.hs	868;"	v
+lispString	ParserEvaluator.hs	579;"	v	file:
+listOps	ParserEvaluator.hs	737;"	v	file:
+load	ParserEvaluator.hs	954;"	v
+main	ParserEvaluator.hs	41;"	v	file:
+makeFunc	ParserEvaluator.hs	913;"	v	file:
+makeNormalFunc	ParserEvaluator.hs	914;"	v	file:
+makePort	ParserEvaluator.hs	936;"	v	file:
+makeString	ParserEvaluator.hs	588;"	v	file:
+makeVarargs	ParserEvaluator.hs	915;"	v	file:
+nullEnv	ParserEvaluator.hs	863;"	v
+numBoolBinop	ParserEvaluator.hs	640;"	v	file:
+numericFloatOp	ParserEvaluator.hs	620;"	v
+numericIntOp	ParserEvaluator.hs	610;"	v
+numericNumOp	ParserEvaluator.hs	615;"	v
+params	ParserEvaluator.hs	307;"	v
+parseAtom	ParserEvaluator.hs	131;"	v	file:
+parseBin	ParserEvaluator.hs	196;"	v	file:
+parseChar	ParserEvaluator.hs	112;"	v	file:
+parseDottedList	ParserEvaluator.hs	251;"	v	file:
+parseDouble	ParserEvaluator.hs	230;"	v	file:
+parseExpr	ParserEvaluator.hs	274;"	v	file:
+parseFloat	ParserEvaluator.hs	223;"	v	file:
+parseHex	ParserEvaluator.hs	216;"	v	file:
+parseInt	ParserEvaluator.hs	174;"	v	file:
+parseList	ParserEvaluator.hs	244;"	v	file:
+parseNumber	ParserEvaluator.hs	77;"	v	file:
+parseOctal	ParserEvaluator.hs	209;"	v	file:
+parseQuoted	ParserEvaluator.hs	259;"	v	file:
+parseString	ParserEvaluator.hs	105;"	v	file:
+primitiveBindings	ParserEvaluator.hs	511;"	v
+primitives	ParserEvaluator.hs	516;"	v	file:
+processChar	ParserEvaluator.hs	124;"	v	file:
+readAll	ParserEvaluator.hs	957;"	v	file:
+readBin	ParserEvaluator.hs	206;"	v	file:
+readBinVector	ParserEvaluator.hs	203;"	v	file:
+readContents	ParserEvaluator.hs	951;"	v	file:
+readExpr	ParserEvaluator.hs	289;"	v
+readExprList	ParserEvaluator.hs	292;"	v	file:
+readOrThrow	ParserEvaluator.hs	284;"	v	file:
+readProc	ParserEvaluator.hs	943;"	v	file:
+runIOThrows	ParserEvaluator.hs	872;"	v
+setVar	ParserEvaluator.hs	886;"	v	file:
+showError	ParserEvaluator.hs	815;"	v
+showVal	ParserEvaluator.hs	374;"	v
+sign	ParserEvaluator.hs	149;"	v	file:
+spaces	ParserEvaluator.hs	241;"	v	file:
+strBoolBinop	ParserEvaluator.hs	641;"	v	file:
+stringAppend	ParserEvaluator.hs	582;"	v	file:
+stringLength	ParserEvaluator.hs	594;"	v	file:
+stringOps	ParserEvaluator.hs	570;"	v	file:
+stringRef	ParserEvaluator.hs	599;"	v	file:
+substring	ParserEvaluator.hs	605;"	v	file:
+symbol	ParserEvaluator.hs	238;"	v	file:
+trapError	ParserEvaluator.hs	833;"	v
+typeChecker	ParserEvaluator.hs	653;"	v	file:
+typeConverter	ParserEvaluator.hs	670;"	v	file:
+unpackBool	ParserEvaluator.hs	718;"	v	file:
+unpackChar	ParserEvaluator.hs	722;"	v	file:
+unpackEquals	ParserEvaluator.hs	726;"	v	file:
+unpackNum	ParserEvaluator.hs	699;"	v	file:
+unpackStr	ParserEvaluator.hs	710;"	v	file:
+unwordsList	ParserEvaluator.hs	397;"	v	file:
+varArg	ParserEvaluator.hs	309;"	v
+vararg	ParserEvaluator.hs	307;"	v
+vectorBaseRead	ParserEvaluator.hs	91;"	v	file:
+vectorDecRead	ParserEvaluator.hs	57;"	v	file:
+writeProc	ParserEvaluator.hs	947;"	v	file:
