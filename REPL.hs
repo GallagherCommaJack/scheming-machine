@@ -3,10 +3,6 @@ import System.IO
 import System.Environment
 import ParserEvaluator
 
-
-
---shell :: IO ()
---shell = getLine >>= print . eval . readExpr
 flushStr :: String -> IO ()
 flushStr str = putStr str >> hFlush stdout
 
@@ -38,7 +34,6 @@ runRepl = do
 	env <- primitiveBindings
 	runIOThrows $ liftM show $ eval env (List [Atom "load", String "stdlib.scm"])
 	until_ (== "quit") (readPrompt "λ>>> ") . evalAndPrint $ env
-
 
 main :: IO ()
 main = do
