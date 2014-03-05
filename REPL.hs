@@ -36,20 +36,9 @@ runOne args = do
 runRepl :: IO ()
 runRepl = do
 	env <- primitiveBindings
-	(runIOThrows $ liftM show $ eval env (List [Atom "load", String "stdlib.scm"]))
+	runIOThrows $ liftM show $ eval env (List [Atom "load", String "stdlib.scm"])
 	until_ (== "quit") (readPrompt "λ>>> ") . evalAndPrint $ env
 
-
---runRepl = primitiveBindings >>= until_ (== "quit") (readPrompt "λ>>> ") . evalAndPrint
-
---shell :: IO ()
---shell = do
---	line <- getLine
---	evaled <- return $ liftM show $ readExpr line >>= eval
---	putStrLn $ extractValue $ trapError evaled
-
---main :: IO()
---main = forever shell
 
 main :: IO ()
 main = do

@@ -3,25 +3,13 @@
 
 module ParserEvaluator
 (   readExpr
-,   showVal
 ,   eval
-,   apply
 ,   LispVal(..)
-,   LispError(..)
-,   showError
-,   ThrowsError
-,   trapError
-,   extractValue
-,   module Control.Monad.Error
 ,   Env
-,   nullEnv
 ,   runIOThrows
 ,   liftThrows
 ,   primitiveBindings
 ,   bindVars
-,   numericIntOp
-,   numericFloatOp
-,   numericNumOp
 ,   load)
 where
 import Text.ParserCombinators.Parsec hiding (spaces)
@@ -35,29 +23,6 @@ import Numeric
 import Data.Ratio
 import GHC.Float
 import qualified Data.Vector as V
-
-main :: IO ()
-main = putStrLn "Yay, it compiled"
-
-baseFloatRead :: Int -> String -> LispVal
-baseFloatRead base numstring = case foldr folder ([],[],False) $ reverse numstring of
-                                        ([],wholes,_) -> Int $ fromIntegral $ vectorBaseRead base $ fromDigitList wholes
-                                        (wholes,decs,_) -> Double $ vectorDecRead base (fromDigitList wholes, fromDigitList decs)
-    where fromDigitList = V.fromList . (map digitToInt)
-          --d@(wholedigs,decdigs) = case foldr ()  numstring of
-          --                          p@(h1,'.':d1) -> (fromDigitList h1, fromDigitList d1)
-          --                          (h1,_) -> (fromDigitList h1,V.fromList [])
-          folder d (_,decs,False) = if '.' == d then ([],decs,True) else ([],d:decs,False)
-          folder d (wholes,decs,True) = (d:wholes,decs,True)
-          recip = 1/(fromIntegral base)
-
-vectorDecRead :: Int -> (V.Vector Int, V.Vector Int) -> Double
-vectorDecRead base (wholedigs,decdigs) = wholepart + decpart
-    where wholepart = readhelp wholedigs
-          decpart = readhelp decdigs / blen
-          blen = fromIntegral $ base ^ V.length decdigs
-          readhelp = fromIntegral . (vectorBaseRead base)
-
 
 parseNumber :: Parser LispVal
 parseNumber =   try parseOctal
