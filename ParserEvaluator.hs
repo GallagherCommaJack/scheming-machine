@@ -596,11 +596,6 @@ contains predicate (x:xs) = if (predicate x)
     else contains predicate xs
 contains _ [] = return $ Bool False
 
-
-
-
-
-
 --Unpackers
 data Unpacker = forall a. Eq a => AnyUnpacker (LispVal -> ThrowsError a)
 
@@ -639,8 +634,6 @@ unpackEquals arg1 arg2 (AnyUnpacker unpacker) =
                 return $ unpacked1 == unpacked2
         `catchError` (const $ return False)
 
-
-
 --List Operations
 listOps :: String -> [LispVal] -> ThrowsError LispVal
 listOps "car" xs = car xs
@@ -667,10 +660,6 @@ cons [x, DottedList xs xlast] = return $ DottedList (x : xs) xlast
 cons [x1, x2] = return $ List [x1,x2]
 cons badArgList = throwError $ NumArgs 2 badArgList
 
-
-
-
-
 --Equality
 equality :: String -> [LispVal] -> ThrowsError LispVal
 equality "eqv" xs = eqv xs
@@ -684,9 +673,7 @@ eqvList eqvFunc [(List arg1), (List arg2)] = return $ Bool $ (length arg1 == len
                                     Left _ -> False
                                     Right (Bool val) -> val
 
-
 eqv :: [LispVal] -> ThrowsError LispVal
---eqv [a,b] = return $ Bool $ a == b
 eqv [(Bool arg1), (Bool arg2)] = return $ Bool $ arg1 == arg2
 eqv [(Int arg1), (Int arg2)] = return $ Bool $ arg1 == arg2
 eqv [(String arg1), (String arg2)] = return $ Bool $ arg1 == arg2
@@ -707,9 +694,6 @@ equal [arg1, arg2] = do
     eqvEquals <- eqv [arg1, arg2]
     return $ Bool $ (primitiveEquals || let (Bool x) = eqvEquals in x)
 equal badArgList = throwError $ NumArgs 2 badArgList
-
-
-
 
 --Error handling
 data LispError = NumArgs Integer [LispVal]
@@ -745,26 +729,6 @@ trapError action = catchError action (return . show)
 extractValue :: ThrowsError a -> a
 extractValue (Right val) = val
 extractValue _ = error "couldn't extract value from LispError"
-
---Environment dispatch
---environment :: String -> Env -> [LispVal] -> ThrowsError LispVal
---environment "set!"  env = setEvaluator env
---environment "define" env = defineEvaluator env
-
-
---setEvaluator :: Env -> [LispVal] -> ThrowsError LispVal
---setEvaluator env [Atom var,form] = eval env form >>= setVar env var
---setEvaluator _ (x:y:xs) = throwError $ TypeMismatch "Atom" x
---setEvaluator _ list = throwError $ NumArgs 2 list
-
-
---defineEvaluator :: Env -> [LispVal] -> ThrowsError LispVal
---defineEvaluator [Atom var,form] = eval env form >>= setVar env var
---defineEvaluator _ (x:y:xs) = throwError $ TypeMismatch "Atom" x
---defineEvaluator _ list = throwError $ NumArgs 2 list
-
-
-
 
 --Environment backend
 type Env = IORef [(String, IORef LispVal)]
